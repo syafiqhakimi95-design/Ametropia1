@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cikgu Mata Pro: Spectacles Edition</title>
+    <title>Clinical Refraction Sim</title>
     <style>
         :root {
             --bg: #f8fafc;
             --primary: #2563eb;
             --text: #0f172a;
-            --glass-border: #64748b;
-            --glass-fill: rgba(200, 230, 255, 0.4);
         }
 
         body {
@@ -109,7 +107,7 @@
         /* CONTROLS */
         .controls-area {
             flex: 0 0 auto;
-            max-height: 50%;
+            max-height: 55%;
             overflow-y: auto; 
             background: var(--bg);
             padding: 15px;
@@ -142,6 +140,16 @@
         .spec-group { flex: 1; }
         .spec-group label { font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px; }
 
+        .acc-meter {
+            height: 4px; background: #eee; border-radius: 2px; overflow: hidden; margin-top: 5px;
+        }
+        .acc-bar {
+            height: 100%; background: var(--primary); width: 0%; transition: width 0.2s;
+        }
+        .acc-limit {
+            height: 100%; width: 2px; background: #ef4444; position: absolute; top:0;
+        }
+
     </style>
 </head>
 <body>
@@ -152,7 +160,7 @@
         <div class="overlay-top-left">
             <div class="badge">
                 <div id="statusDot" class="dot" style="background:green;"></div>
-                <span id="statusText">Parallel</span>
+                <span id="statusText">Clear</span>
             </div>
             <div id="drawStatus" class="badge" style="display:none; color:#dc2626; border-color:#dc2626; background:#fff5f5;">
                 <span id="drawMsg">✎ Zoom Disabled</span>
@@ -176,17 +184,23 @@
         
         <div class="card" style="border-left: 4px solid var(--primary);">
             <h3>
-                <span>Lens Power</span>
+                <span>Lens Response (Auto)</span>
                 <span id="accVal">0.0 D</span>
             </h3>
-            <input type="range" id="accSlider" min="0" max="15" step="0.1" value="0">
-            <div class="labels"><span>Minimum</span><span>Max Effort</span></div>
+            <div style="position:relative; height: 10px; background:#eee; border-radius:5px; margin-top:5px;">
+                <div id="accBar" style="height:100%; width:0%; background:#2563eb; border-radius:5px; transition: width 0.1s;"></div>
+                <div id="limitMarker" style="position:absolute; top:0; bottom:0; width:2px; background:red; left:100%;"></div>
+            </div>
+            <div class="labels" style="margin-top:2px;">
+                <span>0 D</span>
+                <span style="color:red;">Max: <span id="maxAmpTxt">10</span>D</span>
+            </div>
         </div>
 
         <div class="card">
-            <h3>Eye Condition</h3>
+            <h3>Patient Profile</h3>
             <select id="condSelect">
-                <option value="emmetropia">Emmetropia (Normal)</option>
+                <option value="emmetropia">Emmetropia (0.00)</option>
                 <option value="myopia">Myopia (-2.50 D)</option>
                 <option value="hyperopia">Hyperopia (+2.50 D)</option>
             </select>
@@ -194,21 +208,20 @@
                 <label style="font-size:0.9rem;">Age:</label>
                 <div style="display:flex; align-items:center; gap:5px;">
                     <input type="number" id="ageInput" value="20" style="width:50px; text-align:center;">
-                    <span style="font-size:0.75rem; color:#666;">(Max: <span id="maxAmpVal">12.5</span>D)</span>
                 </div>
             </div>
         </div>
 
         <div class="card" id="specCard">
-            <h3>Spectacles & Add</h3>
+            <h3>Correction (Rx)</h3>
             <div class="spec-controls">
                 <div class="spec-group">
-                    <label>Spectacle Power</label>
-                    <input type="number" id="specInput" value="0.00" step="0.25" min="-6.00" max="6.00">
+                    <label>Spectacles (Distance)</label>
+                    <input type="number" id="specInput" value="0.00" step="0.25" min="-10.00" max="10.00">
                 </div>
                 <div class="spec-group" id="addGroup" style="display:none; opacity:0.5;">
-                    <label>ADD Power (Reading)</label>
-                    <input type="number" id="addInput" value="0.00" step="0.25" min="0.00" max="3.50">
+                    <label>Add (Near)</label>
+                    <input type="number" id="addInput" value="0.00" step="0.25" min="0.00" max="4.00">
                 </div>
             </div>
         </div>
@@ -224,19 +237,21 @@
 
         <div style="height: 50px;"></div> 
     </div>
+
 <script>
     const canvas = document.getElementById('simCanvas');
     const ctx = canvas.getContext('2d');
     
     // UI References
     const ui = {
-        accSlider: document.getElementById('accSlider'),
+        accBar: document.getElementById('accBar'),
+        limitMarker: document.getElementById('limitMarker'),
         distSlider: document.getElementById('distSlider'),
         condSelect: document.getElementById('condSelect'),
         ageInput: document.getElementById('ageInput'),
         accVal: document.getElementById('accVal'),
         distVal: document.getElementById('distVal'),
-        maxAmpVal: document.getElementById('maxAmpVal'),
+        maxAmpTxt: document.getElementById('maxAmpTxt'),
         statusText: document.getElementById('statusText'),
         statusDot: document.getElementById('statusDot'),
         specInput: document.getElementById('specInput'),
@@ -252,127 +267,111 @@
 
     // --- 1. APP STATE ---
     let state = {
-        condition: 'emmetropia', age: 20, maxAmp: 12.5, refError: 0,
+        condition: 'emmetropia', age: 20, maxAmp: 12.5, practicalAmp: 12.5,
+        refError: 0, // Uncorrected error of the eye
         specPower: 0, addPower: 0,
-        accEffort: 0, actualAcc: 0, objectDistD: 0, 
+        
+        demandD: 0,        // Dioptric demand of object distance
+        neededAcc: 0,      // What the eye WANTS to exert
+        actualAcc: 0,      // What the eye CAN exert
+        
         isBlurred: false, blurReason: '' 
     };
 
     let camera = { scale: 1, x: 0, y: 0 };
     let drawing = { active: false, color: '#ef4444', lines: [], currentLine: null };
 
-    // --- 2. OPTICAL LOGIC ---
+    // --- 2. OPTICAL LOGIC ENGINE ---
+    
     function updatePhysics() {
+        // 1. Refractive Error (The "Eye's Built-in Power Error")
+        // Myopia = Eye is too strong (+). We denote error as +2.50.
+        // Hyperopia = Eye is too weak (-). Error is -2.50.
         state.condition = ui.condSelect.value;
-        
-        // Age Logic & ADD Visibility
+        if (state.condition === 'emmetropia') state.refError = 0;
+        if (state.condition === 'myopia') state.refError = 2.50;  
+        if (state.condition === 'hyperopia') state.refError = -2.50; 
+
+        // 2. Spectacles & Add
+        state.specPower = parseFloat(ui.specInput.value) || 0;
+        state.addPower = parseFloat(ui.addInput.value) || 0;
+
+        // 3. Age & Amplitude
         let safeAge = parseInt(ui.ageInput.value) || 20;
         if(safeAge < 5) safeAge = 5; if(safeAge > 100) safeAge = 100;
         state.age = safeAge;
-        ui.ageInput.value = safeAge; 
-
-        // Hofstetter's Rule
-        let amp = 18.5 - (0.3 * state.age);
-        state.maxAmp = Math.max(0, amp);
-        ui.maxAmpVal.innerText = state.maxAmp.toFixed(2);
-
-        // Show ADD only if Age >= 40
+        
+        // Show ADD if age >= 40
         if (state.age >= 40) {
             ui.addGroup.style.display = 'block';
             ui.addGroup.style.opacity = '1';
         } else {
             ui.addGroup.style.display = 'none';
-            state.addPower = 0; // Reset ADD if too young
+            state.addPower = 0;
             ui.addInput.value = 0;
         }
 
-        // Refractive Error
-        if (state.condition === 'emmetropia') state.refError = 0;
-        if (state.condition === 'myopia') state.refError = 2.50;  
-        if (state.condition === 'hyperopia') state.refError = -2.50; 
-
-        // Read Specs
-        state.specPower = parseFloat(ui.specInput.value) || 0;
-        state.addPower = parseFloat(ui.addInput.value) || 0;
+        // Hofstetter's Rule
+        let amp = 18.5 - (0.3 * state.age);
+        state.maxAmp = Math.max(0, amp);
+        
+        // Practical Amplitude (Clinical Rule of Thumb: ~60% usable comfortably, but for blur limit we use 100%)
+        // However, for teaching "Presbyopia", the hard wall is the Max Amp.
+        ui.maxAmpTxt.innerText = state.maxAmp.toFixed(2);
+        
+        // Update Marker Position (Relative to 15D max scale)
+        let percent = (state.maxAmp / 15) * 100;
+        if(percent > 100) percent = 100;
+        ui.limitMarker.style.left = percent + "%";
+        
+        calculateVision();
     }
 
-    function onObjectChange() {
-        updatePhysics();
+    function calculateVision() {
+        // 1. Object Demand
         let val = parseFloat(ui.distSlider.value);
-        let demand = (100 - val) / 10; // 0D to 10D
-        state.objectDistD = demand;
+        // Map 100 -> 0D (Infinity), 0 -> 10D (10cm)
+        state.demandD = (100 - val) / 10;
 
-        // Needed Acc = Demand - (RefError + SpecPower) - AddPower
-        // Note: RefError is error of eye. SpecPower corrects it. 
-        // Myope (+2.50 error) + Spec (-2.50) = 0 Net.
+        // 2. Net Refractive Status (Eye + Specs)
+        // If Myope (+2.50) wears Specs (-2.50), Net = 0 (Emmetropia).
+        // If Hyperope (-2.50) wears Specs (+2.50), Net = 0.
+        let netStaticStatus = state.refError + state.specPower; 
         
-        let needed = demand - (state.refError + state.specPower) - state.addPower;
+        // 3. Accommodation Demand
+        // Formula: Needed = Demand - (NetStatus + Add)
+        // Example: Looking at 40cm (2.50D). NetStatus 0. Add 0. Needed = 2.50.
+        // Example: Looking at 40cm (2.50D). NetStatus 0. Add +2.00. Needed = 0.50.
+        let needed = state.demandD - (netStaticStatus + state.addPower);
         
-        // Clamp Min
+        // Clamp Min: Cannot relax below 0 (unless latent hyperopia, but simplified here)
         if (needed < 0) needed = 0;
+        state.neededAcc = needed;
 
-        // Clamp Max (Presbyopia)
-        let clampedAcc = needed;
-        if (clampedAcc > state.maxAmp) {
-            clampedAcc = state.maxAmp;
-        }
-        
-        ui.accSlider.value = clampedAcc;
-        state.accEffort = clampedAcc;
-        state.actualAcc = clampedAcc;
-        
-        checkBlur(needed); 
-        render();
-    }
-
-    function onAccChange() {
-        updatePhysics();
-        let inputAcc = parseFloat(ui.accSlider.value);
-
-        if (inputAcc > state.maxAmp) {
-            inputAcc = state.maxAmp;
-            ui.accSlider.value = inputAcc;
+        // 4. Physical Limitation (The Presbyopia Check)
+        if (state.neededAcc > state.maxAmp) {
+            state.actualAcc = state.maxAmp; // Eye tries its hardest but hits wall
+        } else {
+            state.actualAcc = state.neededAcc; // Eye can handle it
         }
 
-        state.accEffort = inputAcc;
-        state.actualAcc = inputAcc;
-        
-        // Inverse calculation
-        // Acc = Demand - (RefError + Spec) - Add
-        // Demand = Acc + (RefError + Spec) + Add
-        
-        let clearD = state.accEffort + (state.refError + state.specPower) + state.addPower;
-        
-        if (clearD < 0) clearD = 0;
-        state.objectDistD = clearD;
-        
-        let newVal = 100 - (state.objectDistD * 10);
-        if (newVal < 0) newVal = 0; if (newVal > 100) newVal = 100;
-        ui.distSlider.value = newVal;
-        
-        checkBlur(state.accEffort); 
-        render();
-    }
-
-    function checkBlur(originalNeeded) {
-        state.blurReason = '';
+        // 5. Blur Detection
         state.isBlurred = false;
+        state.blurReason = '';
 
-        // 1. Limit Check
-        if (originalNeeded > state.maxAmp) {
+        // Total Power acting on object = NetStatus + Add + ActualAcc
+        // Focus Error = TotalPower - Demand
+        // If Error == 0, image is on retina.
+        let totalPower = netStaticStatus + state.addPower + state.actualAcc;
+        let focusError = totalPower - state.demandD;
+
+        if (Math.abs(focusError) > 0.20) {
             state.isBlurred = true;
-            state.blurReason = 'Near Limit';
+            if (focusError > 0) state.blurReason = "Front Focus"; // Too much power (Myopic)
+            else state.blurReason = "Back Focus"; // Too little power (Hyperopic/Presbyopic)
         }
 
-        // 2. Focus Check
-        let totalPower = state.refError + state.specPower + state.addPower + state.actualAcc;
-        let error = totalPower - state.objectDistD;
-
-        if (Math.abs(error) > 0.20) {
-            state.isBlurred = true;
-            if (error > 0) state.blurReason = "Front Focus"; 
-            if (error < 0) state.blurReason = "Back Focus"; 
-        }
+        render();
     }
 
     // --- 3. INPUT HANDLING ---
@@ -435,13 +434,12 @@
     ui.btnClear.addEventListener('click', () => { drawing.lines = []; render(); });
     ui.btnReset.addEventListener('click', () => { camera.scale=1; camera.x=0; camera.y=0; render(); });
     
-    // UI Event Listeners
-    ui.distSlider.addEventListener('input', onObjectChange);
-    ui.accSlider.addEventListener('input', onAccChange);
-    ui.condSelect.addEventListener('change', () => { updatePhysics(); onObjectChange(); });
-    ui.ageInput.addEventListener('change', () => { updatePhysics(); onObjectChange(); });
-    ui.specInput.addEventListener('input', () => { updatePhysics(); onObjectChange(); });
-    ui.addInput.addEventListener('input', () => { updatePhysics(); onObjectChange(); });
+    // Listeners
+    ui.distSlider.addEventListener('input', calculateVision);
+    ui.condSelect.addEventListener('change', () => { updatePhysics(); });
+    ui.ageInput.addEventListener('change', () => { updatePhysics(); });
+    ui.specInput.addEventListener('input', () => { updatePhysics(); });
+    ui.addInput.addEventListener('input', () => { updatePhysics(); });
     
     document.querySelectorAll('.color-dot').forEach(d => d.addEventListener('click', (e) => {
         document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('selected'));
@@ -452,15 +450,27 @@
 
     // --- 4. RENDER ---
     function render() {
-        ui.accVal.innerText = state.actualAcc.toFixed(1) + " D";
-        let dText = state.objectDistD <= 0.1 ? "Infinity" : (100/state.objectDistD).toFixed(0) + " cm";
+        // UI Updates
+        ui.accVal.innerText = state.actualAcc.toFixed(2) + " D";
+        let dText = state.demandD <= 0.1 ? "Infinity" : (100/state.demandD).toFixed(0) + " cm";
         ui.distVal.innerText = dText;
         
+        // Bar Visuals
+        let barPct = (state.actualAcc / 15) * 100; // 15D is max scale
+        ui.accBar.style.width = barPct + "%";
+        
+        // Visual Logic for Limit
+        if (state.neededAcc > state.maxAmp) {
+            ui.accBar.style.backgroundColor = "#ef4444"; // Red if straining
+        } else {
+            ui.accBar.style.backgroundColor = "#2563eb"; // Blue if okay
+        }
+
         if (state.isBlurred) {
-            ui.statusText.innerText = "Blur (" + (state.blurReason || dText) + ")";
+            ui.statusText.innerText = "Blur (" + (state.blurReason) + ")";
             ui.statusText.style.color = "#dc2626"; ui.statusDot.style.background = "#dc2626";
         } else {
-            ui.statusText.innerText = "Clear (" + dText + ")";
+            ui.statusText.innerText = "Clear";
             ui.statusText.style.color = "#16a34a"; ui.statusDot.style.background = "#16a34a";
         }
 
@@ -483,7 +493,7 @@
         // --- DRAW SPECTACLE LENS ---
         if (state.specPower !== 0) {
             let specX = cx - 90; // In front of cornea
-            let h = 35; // lens height
+            let h = 35; 
             ctx.beginPath();
             if (state.specPower < 0) {
                 // Biconcave )(
@@ -565,8 +575,11 @@
 
         // 7. Retina Image
         let retinaX = cx + eyeRadius;
-        let totalPower = state.refError + state.specPower + state.addPower + state.actualAcc;
-        let error = totalPower - state.objectDistD;
+        // Total Power = NetStatus (Eye+Spec) + Add + Acc
+        let netStatic = state.refError + state.specPower;
+        let total = netStatic + state.addPower + state.actualAcc;
+        let error = total - state.objectDistD;
+        
         let focusX = retinaX;
         if (Math.abs(error) > 0.2) focusX = retinaX - (error * 8);
 
@@ -594,7 +607,7 @@
         ctx.restore();
     }
 
-    updatePhysics(); onObjectChange();
+    updatePhysics();
 </script>
 </body>
 </html>
