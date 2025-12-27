@@ -2,483 +2,599 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cikgu Mata: Accommodation Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cikgu Mata Pro: Spectacles Edition</title>
     <style>
         :root {
+            --bg: #f8fafc;
             --primary: #2563eb;
-            --bg: #f1f5f9;
-            --panel: #ffffff;
             --text: #0f172a;
+            --glass-border: #64748b;
+            --glass-fill: rgba(200, 230, 255, 0.4);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
-            display: flex;
             height: 100vh;
-            flex-direction: row; /* Default: Side by side */
-        }
-
-        /* Responsive Layout for Mobile */
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column; /* Stack vertically on phones */
-                height: 100vh; /* Full viewport height */
-                overflow: hidden; /* Prevent body scroll */
-            }
-            .controls {
-                width: 100% !important;
-                height: 45vh; /* Controls take bottom half */
-                border-right: none;
-                border-top: 1px solid #ccc;
-                order: 2; /* Move controls to bottom */
-            }
-            .simulation-area {
-                height: 55vh; /* Canvas takes top half */
-                order: 1;
-            }
-            h2 { font-size: 1.2rem; margin-bottom: 10px; }
-            .control-group { padding-bottom: 8px; margin-bottom: 8px; }
-            label, .radio-item { font-size: 0.85rem; }
-        }
-
-        /* Sidebar Controls */
-        .controls {
-            width: 300px;
-            background: var(--panel);
-            padding: 15px;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            z-index: 10;
+            overflow: hidden; 
         }
 
-        h2, h3 { margin-top: 0; color: var(--primary); }
-        h3 { font-size: 1rem; margin-bottom: 5px; }
-        
-        .control-group {
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 10px;
-        }
-
-        /* Custom Radio Buttons for easier touch */
-        .radio-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .radio-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.9em;
-            cursor: pointer;
-            padding: 4px 0;
-        }
-        
-        /* Sliders */
-        input[type="range"] {
-            width: 100%;
-            height: 20px; /* Taller for touch */
-            cursor: pointer;
-            margin: 10px 0;
-        }
-        .slider-value {
-            font-size: 0.85em;
-            color: #64748b;
-            text-align: right;
-            display: block;
-        }
-
-        /* Simulation Area */
-        .simulation-area {
-            flex-grow: 1;
+        /* STAGE */
+        .stage-container {
+            flex: 1; 
             position: relative;
             background: #fff;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #info-panel {
-            padding: 10px;
-            background: #e0f2fe;
-            border-bottom: 1px solid #bae6fd;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-            color: #0c4a6e;
-            font-weight: 600;
+            border-bottom: 2px solid #cbd5e1;
+            overflow: hidden;
+            touch-action: none; 
         }
 
         canvas {
+            display: block;
             width: 100%;
             height: 100%;
-            display: block;
+            touch-action: none; 
+            cursor: grab;
+        }
+        canvas.drawing { cursor: crosshair; }
+
+        /* OVERLAYS */
+        .overlay-top-left {
+            position: absolute;
+            top: 10px; left: 10px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
         }
 
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: white;
-            font-size: 0.8em;
-            white-space: nowrap;
+        .badge {
+            background: rgba(255,255,255,0.95);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #ccc;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .status-clear { background-color: #22c55e; }
-        .status-blur { background-color: #ef4444; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        .toolbar {
+            position: absolute;
+            bottom: 10px; right: 10px;
+            display: flex;
+            gap: 5px;
+            background: #fff;
+            padding: 5px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .tool-btn {
+            width: 36px; height: 36px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 6px;
+            font-size: 1.2rem;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .tool-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .color-tray {
+            display: flex; align-items: center; gap: 5px;
+            border-left: 1px solid #ddd; margin-left: 5px; padding-left: 5px;
+        }
+        .color-dot {
+            width: 20px; height: 20px; border-radius: 50%;
+            border: 2px solid transparent; cursor: pointer;
+        }
+        .color-dot.selected { border-color: #333; transform: scale(1.1); }
+
+        /* CONTROLS */
+        .controls-area {
+            flex: 0 0 auto;
+            max-height: 50%;
+            overflow-y: auto; 
+            background: var(--bg);
+            padding: 15px;
+        }
+
+        .card {
+            background: #fff;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+
+        h3 { margin: 0 0 8px 0; font-size: 0.9rem; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        
+        input[type=range] { width: 100%; height: 30px; accent-color: var(--primary); cursor: pointer; }
+        .labels { display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748b; font-weight: 600; }
+        
+        select, input[type="number"] {
+            padding: 8px; border: 1px solid #ccc; border-radius: 6px; background: #fff; width: 100%; font-size: 0.9rem;
+        }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px; }
+
+        /* Spec Power Inputs */
+        .spec-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .spec-group { flex: 1; }
+        .spec-group label { font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px; }
 
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <h2>Optics Lab</h2>
-        
-        <div class="control-group">
-            <h3>1. Eye Condition</h3>
-            <div class="radio-group">
-                <label class="radio-item"><input type="radio" name="condition" value="emmetropia" checked> Emmetropia (Normal)</label>
-                <label class="radio-item"><input type="radio" name="condition" value="myopia"> Myopia</label>
-                <label class="radio-item"><input type="radio" name="condition" value="hyperopia"> Hyperopia</label>
-                <label class="radio-item"><input type="radio" name="condition" value="emmetropia_presby"> Emmetropia + Presby</label>
-                <label class="radio-item"><input type="radio" name="condition" value="myopia_presby"> Myopia + Presby</label>
-                <label class="radio-item"><input type="radio" name="condition" value="hyperopia_presby"> Hyperopia + Presby</label>
-                <label class="radio-item"><input type="radio" name="condition" value="emmetropia_ai"> Accomm. Insufficiency</label>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <h3>2. Patient Age</h3>
-            <label for="ageSlider">Age: <span id="ageVal">20</span> years</label>
-            <input type="range" id="ageSlider" min="10" max="80" value="20">
-        </div>
-
-        <div class="control-group" style="border-bottom: none;">
-            <h3>3. Accommodation (Lens Shape)</h3>
-            <label for="accSlider">Effort: <span id="accCurrent">0.00</span> D</label>
-            <input type="range" id="accSlider" min="0" max="10" step="0.1" value="0">
-            <span class="slider-value" style="color:#ef4444;">Max Limit: <span id="accMax">12.50</span> D</span>
-        </div>
-    </div>
-
-    <div class="simulation-area">
-        <div id="info-panel">
-            <div style="display:flex; flex-direction:column;">
-                <span>Obj Dist: <span id="infoDist" style="color:#2563eb;">-</span></span>
-                <span style="font-weight:normal; font-size:0.8em; margin-top:2px;">(Tally with Acc)</span>
-            </div>
-            <span id="infoVision" class="status-badge status-blur">Blur</span>
-        </div>
+    <div class="stage-container" id="stage">
         <canvas id="simCanvas"></canvas>
+        
+        <div class="overlay-top-left">
+            <div class="badge">
+                <div id="statusDot" class="dot" style="background:green;"></div>
+                <span id="statusText">Parallel</span>
+            </div>
+            <div id="drawStatus" class="badge" style="display:none; color:#dc2626; border-color:#dc2626; background:#fff5f5;">
+                <span id="drawMsg">✎ Zoom Disabled</span>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button class="tool-btn" id="btnReset" title="Reset View">↺</button>
+            <div style="width:1px; background:#ddd; margin:0 2px;"></div>
+            <button class="tool-btn" id="btnPen" title="Draw">✎</button>
+            <div class="color-tray" id="colorTray" style="display:none;">
+                <div class="color-dot selected" style="background:#ef4444;" data-c="#ef4444"></div>
+                <div class="color-dot" style="background:#2563eb;" data-c="#2563eb"></div>
+                <div class="color-dot" style="background:#000000;" data-c="#000000"></div>
+            </div>
+            <button class="tool-btn" id="btnClear" title="Clear Ink" style="margin-left:5px;">🗑️</button>
+        </div>
     </div>
 
+    <div class="controls-area">
+        
+        <div class="card" style="border-left: 4px solid var(--primary);">
+            <h3>
+                <span>Lens Power</span>
+                <span id="accVal">0.0 D</span>
+            </h3>
+            <input type="range" id="accSlider" min="0" max="15" step="0.1" value="0">
+            <div class="labels"><span>Minimum</span><span>Max Effort</span></div>
+        </div>
+
+        <div class="card">
+            <h3>Eye Condition</h3>
+            <select id="condSelect">
+                <option value="emmetropia">Emmetropia (Normal)</option>
+                <option value="myopia">Myopia (-2.50 D)</option>
+                <option value="hyperopia">Hyperopia (+2.50 D)</option>
+            </select>
+            <div class="row">
+                <label style="font-size:0.9rem;">Age:</label>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="number" id="ageInput" value="20" style="width:50px; text-align:center;">
+                    <span style="font-size:0.75rem; color:#666;">(Max: <span id="maxAmpVal">12.5</span>D)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="specCard">
+            <h3>Spectacles & Add</h3>
+            <div class="spec-controls">
+                <div class="spec-group">
+                    <label>Spectacle Power</label>
+                    <input type="number" id="specInput" value="0.00" step="0.25" min="-6.00" max="6.00">
+                </div>
+                <div class="spec-group" id="addGroup" style="display:none; opacity:0.5;">
+                    <label>ADD Power (Reading)</label>
+                    <input type="number" id="addInput" value="0.00" step="0.25" min="0.00" max="3.50">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>
+                <span>Object Distance ⚫</span>
+                <span id="distVal">Infinity</span>
+            </h3>
+            <input type="range" id="distSlider" min="0" max="100" step="0.5" value="100">
+            <div class="labels"><span>Close (10cm)</span><span>Infinity</span></div>
+        </div>
+
+        <div style="height: 50px;"></div> 
+    </div>
 <script>
-    // --- SETUP ---
     const canvas = document.getElementById('simCanvas');
     const ctx = canvas.getContext('2d');
-
-    // UI Elements
-    const els = {
-        radios: document.getElementsByName('condition'),
-        ageSlider: document.getElementById('ageSlider'),
-        ageVal: document.getElementById('ageVal'),
+    
+    // UI References
+    const ui = {
         accSlider: document.getElementById('accSlider'),
-        accCurrent: document.getElementById('accCurrent'),
-        accMax: document.getElementById('accMax'),
-        infoDist: document.getElementById('infoDist'),
-        infoVision: document.getElementById('infoVision')
+        distSlider: document.getElementById('distSlider'),
+        condSelect: document.getElementById('condSelect'),
+        ageInput: document.getElementById('ageInput'),
+        accVal: document.getElementById('accVal'),
+        distVal: document.getElementById('distVal'),
+        maxAmpVal: document.getElementById('maxAmpVal'),
+        statusText: document.getElementById('statusText'),
+        statusDot: document.getElementById('statusDot'),
+        specInput: document.getElementById('specInput'),
+        addInput: document.getElementById('addInput'),
+        addGroup: document.getElementById('addGroup'),
+        btnPen: document.getElementById('btnPen'),
+        btnReset: document.getElementById('btnReset'),
+        btnClear: document.getElementById('btnClear'),
+        colorTray: document.getElementById('colorTray'),
+        drawStatus: document.getElementById('drawStatus'),
+        drawMsg: document.getElementById('drawMsg')
     };
 
-    // State
+    // --- 1. APP STATE ---
     let state = {
-        condition: 'emmetropia',
-        age: 20,
-        accExerted: 0,
-        accAmpMax: 0,
-        basePower: 60,           // Standard eye power
-        axialLength: 0.01667     // Standard length (meters)
+        condition: 'emmetropia', age: 20, maxAmp: 12.5, refError: 0,
+        specPower: 0, addPower: 0,
+        accEffort: 0, actualAcc: 0, objectDistD: 0, 
+        isBlurred: false, blurReason: '' 
     };
 
-    // Constants
-    const BASE_AXIAL_LENGTH = 1000 / 60; // ~16.67mm
-    const MYOPIA_OFFSET = 1.5;     // mm longer (Requires less power)
-    const HYPEROPIA_OFFSET = -1.5; // mm shorter (Requires more power)
+    let camera = { scale: 1, x: 0, y: 0 };
+    let drawing = { active: false, color: '#ef4444', lines: [], currentLine: null };
 
-    // --- LOGIC ---
+    // --- 2. OPTICAL LOGIC ---
+    function updatePhysics() {
+        state.condition = ui.condSelect.value;
+        
+        // Age Logic & ADD Visibility
+        let safeAge = parseInt(ui.ageInput.value) || 20;
+        if(safeAge < 5) safeAge = 5; if(safeAge > 100) safeAge = 100;
+        state.age = safeAge;
+        ui.ageInput.value = safeAge; 
 
-    // 1. Hofstetter's Formula
-    function calculateAmplitude() {
+        // Hofstetter's Rule
         let amp = 18.5 - (0.3 * state.age);
-        
-        // Clamp to 0 if negative
-        if (amp < 0) amp = 0;
+        state.maxAmp = Math.max(0, amp);
+        ui.maxAmpVal.innerText = state.maxAmp.toFixed(2);
 
-        // Apply Accommodation Insufficiency Penalty (50% reduction)
-        if (state.condition === 'emmetropia_ai') {
-            amp = amp * 0.5;
+        // Show ADD only if Age >= 40
+        if (state.age >= 40) {
+            ui.addGroup.style.display = 'block';
+            ui.addGroup.style.opacity = '1';
+        } else {
+            ui.addGroup.style.display = 'none';
+            state.addPower = 0; // Reset ADD if too young
+            ui.addInput.value = 0;
         }
 
-        return parseFloat(amp.toFixed(2));
+        // Refractive Error
+        if (state.condition === 'emmetropia') state.refError = 0;
+        if (state.condition === 'myopia') state.refError = 2.50;  
+        if (state.condition === 'hyperopia') state.refError = -2.50; 
+
+        // Read Specs
+        state.specPower = parseFloat(ui.specInput.value) || 0;
+        state.addPower = parseFloat(ui.addInput.value) || 0;
     }
 
-    // 2. Main Update Loop
-    function updateSimulation() {
-        // A. Read Inputs
-        els.radios.forEach(r => { if(r.checked) state.condition = r.value });
-        state.age = parseInt(els.ageSlider.value);
-        els.ageVal.textContent = state.age;
+    function onObjectChange() {
+        updatePhysics();
+        let val = parseFloat(ui.distSlider.value);
+        let demand = (100 - val) / 10; // 0D to 10D
+        state.objectDistD = demand;
 
-        // B. Set Eye Geometry (Axial Length)
-        let lengthMM = BASE_AXIAL_LENGTH;
-        if (state.condition.includes('myopia')) lengthMM += MYOPIA_OFFSET;
-        if (state.condition.includes('hyperopia')) lengthMM += HYPEROPIA_OFFSET;
-        state.axialLength = lengthMM / 1000; // Convert to meters
+        // Needed Acc = Demand - (RefError + SpecPower) - AddPower
+        // Note: RefError is error of eye. SpecPower corrects it. 
+        // Myope (+2.50 error) + Spec (-2.50) = 0 Net.
+        
+        let needed = demand - (state.refError + state.specPower) - state.addPower;
+        
+        // Clamp Min
+        if (needed < 0) needed = 0;
 
-        // C. Calculate Max Accommodation allowed by Age
-        state.accAmpMax = calculateAmplitude();
-        els.accMax.textContent = state.accAmpMax.toFixed(2);
-        
-        // Update Slider Max
-        els.accSlider.max = state.accAmpMax;
-        
-        // Enforce Limit (If age increases, current acc might need to drop)
-        let currentInput = parseFloat(els.accSlider.value);
-        if (currentInput > state.accAmpMax) {
-            currentInput = state.accAmpMax;
-            els.accSlider.value = currentInput;
+        // Clamp Max (Presbyopia)
+        let clampedAcc = needed;
+        if (clampedAcc > state.maxAmp) {
+            clampedAcc = state.maxAmp;
         }
-        state.accExerted = currentInput;
-        els.accCurrent.textContent = state.accExerted.toFixed(2);
-
-        // D. Calculate Object Distance (The "Tally" Logic)
-        // Formula: P_total = P_base + Acc
-        // We want to find the Object Distance (u) where vision is CLEAR.
-        // Lens Formula: 1/f = 1/v - 1/u (Cartesian) -> P_total = 1/AxialLength - 1/u
-        // Rearranged: 1/u = 1/AxialLength - P_total
         
-        let P_total = state.basePower + state.accExerted;
-        let vergenceDifference = (1 / state.axialLength) - P_total; // This is the vergence leaving the eye required
-
-        let objectDistance = 0;
-        let distText = "";
-        let isVirtualObj = false; // For uncorrected hyperopia
-
-        // Threshold for "Infinity" (approx 0.05D)
-        if (Math.abs(vergenceDifference) < 0.05) {
-            objectDistance = Infinity;
-            distText = "Infinity (Optical)";
-        } else if (vergenceDifference > 0) {
-            // Positive Vergence required = Real Object in front of eye
-            objectDistance = 1 / vergenceDifference;
-            distText = (objectDistance * 100).toFixed(1) + " cm";
-        } else {
-            // Negative Vergence required = Virtual Object behind eye
-            // This happens in Hyperopia when Acc is not enough to correct the error
-            isVirtualObj = true;
-            objectDistance = 1 / vergenceDifference; // Negative value
-            distText = "Blur (Needs " + Math.abs(vergenceDifference).toFixed(2) + "D more)";
-        }
-
-        // Update UI Text
-        els.infoDist.textContent = distText;
+        ui.accSlider.value = clampedAcc;
+        state.accEffort = clampedAcc;
+        state.actualAcc = clampedAcc;
         
-        if (isVirtualObj) {
-            els.infoVision.textContent = "BLUR";
-            els.infoVision.className = "status-badge status-blur";
-        } else {
-            els.infoVision.textContent = "CLEAR";
-            els.infoVision.className = "status-badge status-clear";
-        }
-
-        // E. Trigger Draw
-        draw(objectDistance, isVirtualObj);
+        checkBlur(needed); 
+        render();
     }
 
-    // --- DRAWING ---
-    function draw(objDist, isVirtual) {
-        // Responsive Canvas
-        canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = canvas.parentElement.clientHeight;
+    function onAccChange() {
+        updatePhysics();
+        let inputAcc = parseFloat(ui.accSlider.value);
+
+        if (inputAcc > state.maxAmp) {
+            inputAcc = state.maxAmp;
+            ui.accSlider.value = inputAcc;
+        }
+
+        state.accEffort = inputAcc;
+        state.actualAcc = inputAcc;
         
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
+        // Inverse calculation
+        // Acc = Demand - (RefError + Spec) - Add
+        // Demand = Acc + (RefError + Spec) + Add
         
-        // Scale Factor (Adjust based on screen width for consistency)
-        const scale = canvas.width < 500 ? 12 : 18; 
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // 1. Draw Eye Globe
-        // Calculate visible size based on axial length
-        let eyeRadius = (state.axialLength * 1000) * scale / 2;
-        let lensX = cx + (canvas.width < 500 ? 50 : 100) - eyeRadius; // Anchor lens position relative to center
-        let retinaX = lensX + (state.axialLength * 1000 * scale);
-
-        ctx.beginPath();
-        ctx.arc(lensX + eyeRadius, cy, eyeRadius, 0, Math.PI * 2);
-        ctx.fillStyle = "#fff";
-        ctx.fill();
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // 2. DYNAMIC LENS (Thickness changes with Acc)
-        // Min thickness 6px, Max adds 1.5px per Diopter
-        let lensThickness = 6 + (state.accExerted * 1.8); 
-        let lensHeight = 50; 
-
-        ctx.beginPath();
-        ctx.ellipse(lensX, cy, lensThickness, lensHeight, 0, 0, 2 * Math.PI);
-        // Pretty Gradient
-        let grad = ctx.createRadialGradient(lensX, cy, 2, lensX, cy, lensHeight);
-        grad.addColorStop(0, "rgba(180, 220, 255, 0.95)");
-        grad.addColorStop(1, "rgba(80, 160, 255, 0.85)");
-        ctx.fillStyle = grad;
-        ctx.fill();
-        ctx.strokeStyle = "#2563eb";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // 3. Draw Retina Line
-        ctx.strokeStyle = "#ef4444"; 
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(retinaX, cy - 60);
-        ctx.lineTo(retinaX, cy + 60);
-        ctx.stroke();
-        ctx.fillStyle = "#ef4444";
-        ctx.font = "12px Arial";
-        ctx.fillText("Retina", retinaX - 20, cy - 70);
-
-        // 4. Ray Tracing & Object
+        let clearD = state.accEffort + (state.refError + state.specPower) + state.addPower;
         
-        // Define Object Screen Position (objX)
-        let objX = -9999;
+        if (clearD < 0) clearD = 0;
+        state.objectDistD = clearD;
         
-        if(objDist === Infinity) {
-            objX = -9000;
-        } else if (!isVirtual) {
-            // Real object in front
-            objX = lensX - (objDist * 1000 * scale);
+        let newVal = 100 - (state.objectDistD * 10);
+        if (newVal < 0) newVal = 0; if (newVal > 100) newVal = 100;
+        ui.distSlider.value = newVal;
+        
+        checkBlur(state.accEffort); 
+        render();
+    }
+
+    function checkBlur(originalNeeded) {
+        state.blurReason = '';
+        state.isBlurred = false;
+
+        // 1. Limit Check
+        if (originalNeeded > state.maxAmp) {
+            state.isBlurred = true;
+            state.blurReason = 'Near Limit';
+        }
+
+        // 2. Focus Check
+        let totalPower = state.refError + state.specPower + state.addPower + state.actualAcc;
+        let error = totalPower - state.objectDistD;
+
+        if (Math.abs(error) > 0.20) {
+            state.isBlurred = true;
+            if (error > 0) state.blurReason = "Front Focus"; 
+            if (error < 0) state.blurReason = "Back Focus"; 
+        }
+    }
+
+    // --- 3. INPUT HANDLING ---
+    let evCache = []; let prevDiff = -1;
+    function getPtrPos(e) { const r = canvas.getBoundingClientRect(); return {x: e.clientX-r.left, y: e.clientY-r.top}; }
+    function toWorld(sx, sy) {
+        const r = canvas.getBoundingClientRect(); const w=r.width; const h=r.height;
+        return {x: (sx-(w/2)-camera.x)/camera.scale, y: (sy-(h/2)-camera.y)/camera.scale};
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+        evCache.push(e); canvas.setPointerCapture(e.pointerId);
+        if (drawing.active && evCache.length === 1) {
+            const p = getPtrPos(e); drawing.currentLine = {color: drawing.color, points:[toWorld(p.x, p.y)]};
+            drawing.lines.push(drawing.currentLine); render();
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        const i = evCache.findIndex((ev) => ev.pointerId === e.pointerId); if (i > -1) evCache[i] = e;
+        if (drawing.active) {
+            if (drawing.currentLine && evCache.length === 1) {
+                const p = getPtrPos(e); drawing.currentLine.points.push(toWorld(p.x, p.y)); render();
+            }
         } else {
-            // Virtual object (Behind eye) - unused for drawing usually, but for logic
-            objX = lensX + (Math.abs(objDist) * 1000 * scale);
+            if (evCache.length === 2) {
+                const cur = Math.sqrt(Math.pow(evCache[1].clientX-evCache[0].clientX,2)+Math.pow(evCache[1].clientY-evCache[0].clientY,2));
+                if (prevDiff > 0) {
+                    let s = camera.scale + (cur - prevDiff) * 0.01;
+                    if (s > 0.5 && s < 5) camera.scale = s;
+                }
+                prevDiff = cur; render();
+            } else if (evCache.length === 1) {
+                camera.x += (e.movementX||0); camera.y += (e.movementY||0); render();
+            }
         }
+    });
 
-        // Draw the visible object arrow if it fits on screen
-        if (!isVirtual && objX > -2000) {
-            drawArrow(ctx, objX, cy, 50, "Object");
-        } else if (objDist === Infinity) {
-            ctx.font = "16px Arial";
-            ctx.fillStyle = "#333";
-            ctx.fillText("∞ Object at Infinity", 20, cy - 80);
+    function ptrUp(e) {
+        const i = evCache.findIndex((ev) => ev.pointerId === e.pointerId); if (i > -1) evCache.splice(i, 1);
+        canvas.releasePointerCapture(e.pointerId);
+        if (evCache.length < 2) prevDiff = -1;
+        if (drawing.active && evCache.length === 0) drawing.currentLine = null;
+    }
+    canvas.addEventListener('pointerup', ptrUp); canvas.addEventListener('pointercancel', ptrUp);
+    canvas.addEventListener('wheel', (e) => { if(drawing.active)return; e.preventDefault(); 
+        let s = camera.scale + (e.deltaY > 0 ? -0.1 : 0.1); if(s>0.5 && s<5) { camera.scale=s; render(); } }, {passive:false});
+
+    // Tools
+    ui.btnPen.addEventListener('click', () => {
+        drawing.active = !drawing.active;
+        if(drawing.active) {
+            ui.btnPen.classList.add('active'); ui.colorTray.style.display='flex'; ui.drawStatus.style.display='flex';
+            ui.drawMsg.innerText = "✎ Drawing (Zoom Disabled)"; canvas.classList.add('drawing');
+        } else {
+            ui.btnPen.classList.remove('active'); ui.colorTray.style.display='none'; ui.drawStatus.style.display='none';
+            canvas.classList.remove('drawing'); drawing.currentLine = null;
         }
+    });
+    ui.btnClear.addEventListener('click', () => { drawing.lines = []; render(); });
+    ui.btnReset.addEventListener('click', () => { camera.scale=1; camera.x=0; camera.y=0; render(); });
+    
+    // UI Event Listeners
+    ui.distSlider.addEventListener('input', onObjectChange);
+    ui.accSlider.addEventListener('input', onAccChange);
+    ui.condSelect.addEventListener('change', () => { updatePhysics(); onObjectChange(); });
+    ui.ageInput.addEventListener('change', () => { updatePhysics(); onObjectChange(); });
+    ui.specInput.addEventListener('input', () => { updatePhysics(); onObjectChange(); });
+    ui.addInput.addEventListener('input', () => { updatePhysics(); onObjectChange(); });
+    
+    document.querySelectorAll('.color-dot').forEach(d => d.addEventListener('click', (e) => {
+        document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('selected'));
+        e.target.classList.add('selected'); drawing.color = e.target.getAttribute('data-c');
+    }));
+    window.addEventListener('resize', render);
 
-        // Setup Rays
-        ctx.lineWidth = 2;
-        let imgX = retinaX; // By default, we assume Tally logic holds (Clear Image)
-        let raysColor = "rgba(255, 165, 0, 0.6)"; // Orange input
 
-        // Adjust Image X if Virtual (Blurry Hyperopia)
-        if (isVirtual) {
-            // In uncorrected hyperopia, the focal point is behind the retina
-            // Focal length f = 1/P_total
-            // Light comes from infinity (usually), but if we try to see near, it's worse.
-            // Let's assume testing at Infinity for the blur calculation logic visually
-            // P_total vs 1/AxialLength
-            let P_total = state.basePower + state.accExerted;
-            let focalLenMeters = 1 / P_total;
-            imgX = lensX + (focalLenMeters * 1000 * scale); 
-            // Since P_total < 1/Axial, FocalLen > Axial, so imgX > retinaX (Focus behind)
-        }
-
-        // --- DRAW RAYS ---
-        // A. Incoming Rays (Object -> Lens)
-        ctx.strokeStyle = raysColor;
-        ctx.beginPath();
+    // --- 4. RENDER ---
+    function render() {
+        ui.accVal.innerText = state.actualAcc.toFixed(1) + " D";
+        let dText = state.objectDistD <= 0.1 ? "Infinity" : (100/state.objectDistD).toFixed(0) + " cm";
+        ui.distVal.innerText = dText;
         
-        if (objDist === Infinity) {
-            // Parallel Lines
-            ctx.moveTo(0, cy - 40); ctx.lineTo(lensX, cy - 40);
-            ctx.moveTo(0, cy);      ctx.lineTo(lensX, cy);
-            ctx.moveTo(0, cy + 40); ctx.lineTo(lensX, cy + 40);
-        } else if (!isVirtual) {
-            // Diverging from Object
-            // Clamp objX to edge of screen if it's too far left, to keep lines visible
-            let startX = Math.max(objX, 0); 
-            // Calculate Y at startX based on slope from true ObjX
-            // Slope = (LensY - ObjY) / (LensX - ObjX)
-            // It's easier to just draw from objX if visible, or simulate if offscreen.
-            // For simplicity in this view, if offscreen, we approximate divergence.
-            
-            ctx.moveTo(objX, cy-50); ctx.lineTo(lensX, cy-40); // Top tip to Top lens
-            ctx.moveTo(objX, cy-50); ctx.lineTo(lensX, cy);    // Top tip to Center
-            ctx.moveTo(objX, cy-50); ctx.lineTo(lensX, cy+40); // Top tip to Bottom
+        if (state.isBlurred) {
+            ui.statusText.innerText = "Blur (" + (state.blurReason || dText) + ")";
+            ui.statusText.style.color = "#dc2626"; ui.statusDot.style.background = "#dc2626";
+        } else {
+            ui.statusText.innerText = "Clear (" + dText + ")";
+            ui.statusText.style.color = "#16a34a"; ui.statusDot.style.background = "#16a34a";
         }
-        ctx.stroke();
 
-        // B. Refracted Rays (Lens -> Retina/Image)
-        ctx.strokeStyle = "#2563eb"; // Blue
-        ctx.beginPath();
+        const dpr = window.devicePixelRatio || 1; const r = canvas.getBoundingClientRect();
+        canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+        ctx.resetTransform(); ctx.scale(dpr, dpr);
+        ctx.save();
+        ctx.translate(r.width/2, r.height/2); ctx.translate(camera.x, camera.y); ctx.scale(camera.scale, camera.scale);
+
+        const cx = 100; const cy = 0; const eyeRadius = 60;
+
+        // 1. Eye Body
+        ctx.beginPath(); ctx.arc(cx, cy, eyeRadius, 0, Math.PI*2);
+        ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#334155"; ctx.lineWidth = 2; ctx.stroke();
         
-        // All rays converge to the Image Point
-        // If clear, Image Point = Retina Point
-        // The image of the TIP is inverted.
-        let imgTipY = cy + 50; 
-        if(objDist === Infinity) imgTipY = cy; // Point focus
-
-        ctx.moveTo(lensX, cy-40); ctx.lineTo(imgX, imgTipY);
-        ctx.moveTo(lensX, cy);    ctx.lineTo(imgX, imgTipY);
-        ctx.moveTo(lensX, cy+40); ctx.lineTo(imgX, imgTipY);
-        ctx.stroke();
-
-        // C. Visual Feedback (Blur Circle)
-        if (Math.abs(imgX - retinaX) > 5) {
-            ctx.fillStyle = "rgba(239, 68, 68, 0.3)"; // Red transparent
+        // 2. Cornea
+        ctx.beginPath(); ctx.arc(cx - 55, cy, 28, 1.4, 4.88);
+        ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill(); ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 1; ctx.stroke();
+        
+        // --- DRAW SPECTACLE LENS ---
+        if (state.specPower !== 0) {
+            let specX = cx - 90; // In front of cornea
+            let h = 35; // lens height
             ctx.beginPath();
-            // Draw circle on retina representing blur patch
-            let blurRadius = Math.abs(imgX - retinaX) / 4; 
-            ctx.arc(retinaX, cy, blurRadius, 0, Math.PI*2);
-            ctx.fill();
+            if (state.specPower < 0) {
+                // Biconcave )(
+                ctx.moveTo(specX-3, -h); ctx.quadraticCurveTo(specX+2, 0, specX-3, h); // Left curve
+                ctx.lineTo(specX+3, h); ctx.quadraticCurveTo(specX-2, 0, specX+3, -h); // Right curve
+                ctx.lineTo(specX-3, -h);
+            } else {
+                // Biconvex ()
+                ctx.moveTo(specX, -h); ctx.quadraticCurveTo(specX+6, 0, specX, h); // Right curve
+                ctx.moveTo(specX, -h); ctx.quadraticCurveTo(specX-6, 0, specX, h); // Left curve
+            }
+            ctx.fillStyle = "rgba(200, 230, 255, 0.5)"; ctx.fill();
+            ctx.strokeStyle = "#64748b"; ctx.lineWidth = 1.5; ctx.stroke();
+            
+            // Label
+            ctx.fillStyle = "#2563eb"; ctx.font = "10px Arial"; ctx.textAlign = "center";
+            ctx.fillText((state.specPower>0?"+":"") + state.specPower.toFixed(2), specX, -h-5);
         }
-    }
 
-    function drawArrow(context, x, y, h, label) {
-        context.strokeStyle = "#333";
-        context.lineWidth = 2;
-        context.beginPath();
-        context.moveTo(x, y);
-        context.lineTo(x, y - h);
-        context.stroke();
+        // 3. Iris
+        ctx.beginPath();
+        ctx.moveTo(cx - 50, cy - 40); ctx.lineTo(cx - 50, cy - 15);
+        ctx.moveTo(cx - 50, cy + 40); ctx.lineTo(cx - 50, cy + 15);
+        ctx.strokeStyle = "#854d0e"; ctx.lineWidth = 5; ctx.stroke();
+
+        // 4. Lens (Slim)
+        let lensX = cx - 35;
+        let growth = state.actualAcc * 0.7; 
+        let lensThick = Math.min(5 + growth, 16); 
+        ctx.beginPath(); ctx.ellipse(lensX, cy, lensThick, 32, 0, 0, Math.PI*2);
+        ctx.fillStyle = "#bae6fd"; ctx.fill(); ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 2; ctx.stroke();
+
+        // 5. Object
+        let slide = parseFloat(ui.distSlider.value) / 100;
+        let startX = -400; let endX = cx - 140;
+        let objX = endX - (slide * (endX - startX));
+        if (state.objectDistD < 0.1) {
+            ctx.fillStyle = "#334155"; ctx.font = "30px sans-serif"; ctx.fillText("∞", -350, cy + 10);
+        } else {
+            ctx.beginPath(); ctx.arc(objX, cy, 5, 0, Math.PI*2); ctx.fillStyle = "#000"; ctx.fill();
+        }
+
+        // 6. Rays
+        let corneaX = cx - 60;
+        ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2 / camera.scale; ctx.beginPath();
         
-        // Arrowhead
-        context.beginPath();
-        context.moveTo(x - 5, y - h + 5);
-        context.lineTo(x, y - h);
-        context.lineTo(x + 5, y - h + 5);
-        context.stroke();
+        let rayStartX = state.objectDistD < 0.1 ? -1000 : objX;
+        let specX = cx - 90;
+        
+        // Ray Path
+        if (state.objectDistD < 0.1) {
+            // Parallel start
+            ctx.moveTo(rayStartX, -10); 
+            if(state.specPower !== 0) ctx.lineTo(specX, -10);
+            ctx.lineTo(corneaX, -15); ctx.lineTo(lensX, -20);
+            
+            ctx.moveTo(rayStartX, 10); 
+            if(state.specPower !== 0) ctx.lineTo(specX, 10);
+            ctx.lineTo(corneaX, 15); ctx.lineTo(lensX, 20);
+        } else {
+            // Diverging start
+            ctx.moveTo(rayStartX, 0); 
+            if(state.specPower !== 0) {
+                ctx.lineTo(specX, -12); ctx.lineTo(corneaX, -15);
+            } else {
+                ctx.lineTo(corneaX, -15);
+            }
+            ctx.lineTo(lensX, -20);
 
-        if (label) {
-            context.fillStyle = "#333";
-            context.font = "14px Arial";
-            context.fillText(label, x - 15, y - h - 10);
+            ctx.moveTo(rayStartX, 0); 
+            if(state.specPower !== 0) {
+                ctx.lineTo(specX, 12); ctx.lineTo(corneaX, 15);
+            } else {
+                ctx.lineTo(corneaX, 15);
+            }
+            ctx.lineTo(lensX, 20);
         }
+        ctx.stroke();
+
+        // 7. Retina Image
+        let retinaX = cx + eyeRadius;
+        let totalPower = state.refError + state.specPower + state.addPower + state.actualAcc;
+        let error = totalPower - state.objectDistD;
+        let focusX = retinaX;
+        if (Math.abs(error) > 0.2) focusX = retinaX - (error * 8);
+
+        ctx.strokeStyle = "#3b82f6"; ctx.beginPath();
+        ctx.moveTo(lensX, cy - 20); ctx.lineTo(focusX, cy);
+        ctx.moveTo(lensX, cy + 20); ctx.lineTo(focusX, cy);
+        ctx.stroke();
+
+        ctx.beginPath();
+        if (state.isBlurred) {
+            ctx.fillStyle = "rgba(220, 38, 38, 0.6)"; ctx.arc(retinaX, cy, 6, 0, Math.PI*2);
+        } else {
+            ctx.fillStyle = "#16a34a"; ctx.arc(retinaX, cy, 3, 0, Math.PI*2);
+        }
+        ctx.fill();
+
+        // 8. Ink
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        drawing.lines.forEach(l => {
+            ctx.beginPath(); ctx.strokeStyle = l.color; ctx.lineWidth = 3 / camera.scale;
+            if (l.points.length > 0) { ctx.moveTo(l.points[0].x, l.points[0].y); for(let i=1; i<l.points.length; i++) ctx.lineTo(l.points[i].x, l.points[i].y); }
+            ctx.stroke();
+        });
+
+        ctx.restore();
     }
 
-    // Listeners
-    els.radios.forEach(r => r.addEventListener('change', updateSimulation));
-    els.ageSlider.addEventListener('input', updateSimulation);
-    els.accSlider.addEventListener('input', updateSimulation);
-    window.addEventListener('resize', () => draw(Infinity, false)); // Redraw on rotate
-
-    // Init
-    updateSimulation();
-
+    updatePhysics(); onObjectChange();
 </script>
 </body>
 </html>
